@@ -137,6 +137,8 @@ import Cardano.Wallet.Primitive.Types.Tx
     , txOutCoin
     , txSizeDistance
     )
+import Cardano.Wallet.Primitive.Types.UTxO
+    ( UTxO (..) )
 import Cardano.Wallet.Shelley.Compatibility
     ( cardanoCertKeysForWitnesses
     , fromCardanoAddress
@@ -241,6 +243,8 @@ import qualified Cardano.Wallet.Primitive.Types.TokenMap as TokenMap
 import qualified Cardano.Wallet.Shelley.Compatibility as Compatibility
 import qualified Codec.CBOR.Encoding as CBOR
 import qualified Codec.CBOR.Write as CBOR
+import Data.Bifunctor
+    ( bimap )
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Foldable as F
@@ -551,6 +555,8 @@ newTransactionLayer networkId = TransactionLayer
     , evaluateMinimumFee =
         _evaluateMinimumFee
 
+    , evaluateTransactionBalance = _evaluateTransactionBalance
+
     , computeSelectionLimit = \pp ctx outputsToCover ->
         let txMaxSize = getTxMaxSize $ txParameters pp in
         MaximumInputLimit $
@@ -568,6 +574,51 @@ newTransactionLayer networkId = TransactionLayer
 
 _decodeSealedTx :: SealedTx -> (Tx, TokenMap, TokenMap, [Certificate])
 _decodeSealedTx (cardanoTx -> InAnyCardanoEra _era tx) = fromCardanoTx tx
+
+_evaluateTransactionBalance
+    :: SealedTx -> Cardano.ProtocolParameters -> UTxO -> Maybe Cardano.Value
+_evaluateTransactionBalance tx pp utxo = do
+    shelleyTx <- inAnyShelleyBasedEra $ cardanoTx tx
+    pure $ withShelleyBasedBody shelleyTx $ \era bod ->
+        let
+            utxo' =  Cardano.UTxO
+                . Map.fromList
+                . map (bimap toCardanoTxIn (toCardanoTxOut era))
+                . Map.toList
+                $ unUTxO utxo
+
+        in
+            lovelaceFromCardanoTxOutValue
+                $ Cardano.evaluateTransactionBalance pp mempty utxo' bod
+  where
+    lovelaceFromCardanoTxOutValue
+        :: forall era. Cardano.TxOutValue era -> Cardano.Value
+    lovelaceFromCardanoTxOutValue (Cardano.TxOutAdaOnly _ ada) =
+        Cardano.lovelaceToValue ada
+    lovelaceFromCardanoTxOutValue (Cardano.TxOutValue _ val) =
+        val
+
+    withShelleyBasedBody
+        :: Cardano.InAnyShelleyBasedEra Cardano.Tx
+        -> (forall era. IsShelleyBasedEra era
+            => ShelleyBasedEra era -> Cardano.TxBody era -> a)
+        -> a
+    withShelleyBasedBody (Cardano.InAnyShelleyBasedEra era (Cardano.Tx bod _)) f
+        = f era bod
+
+inAnyShelleyBasedEra
+    :: InAnyCardanoEra a
+    -> Maybe (Cardano.InAnyShelleyBasedEra a)
+inAnyShelleyBasedEra (InAnyCardanoEra Cardano.ByronEra _) =
+    Nothing
+inAnyShelleyBasedEra (InAnyCardanoEra Cardano.ShelleyEra a) =
+    Just $ Cardano.InAnyShelleyBasedEra Cardano.ShelleyBasedEraShelley a
+inAnyShelleyBasedEra (InAnyCardanoEra Cardano.AllegraEra a) =
+    Just $ Cardano.InAnyShelleyBasedEra Cardano.ShelleyBasedEraAllegra a
+inAnyShelleyBasedEra (InAnyCardanoEra Cardano.MaryEra a) =
+    Just $ Cardano.InAnyShelleyBasedEra Cardano.ShelleyBasedEraMary a
+inAnyShelleyBasedEra (InAnyCardanoEra Cardano.AlonzoEra a) =
+    Just $ Cardano.InAnyShelleyBasedEra Cardano.ShelleyBasedEraAlonzo a
 
 mkDelegationCertificates
     :: DelegationAction
