@@ -52,6 +52,7 @@ packages:
   , lib/test-utils/
   , lib/shelley/
   , lib/strict-non-empty-containers/
+  , prototypes/light-mode-test/
 
 -- Using a fork until our patches can be merged upstream
 source-repository-package
