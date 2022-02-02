@@ -322,6 +322,8 @@ import Cardano.Wallet.Compat
     ( (^?) )
 import Cardano.Wallet.DB
     ( DBFactory (..) )
+import Cardano.Wallet.DB.Sqlite.AddressBook
+    ( AddressBookIso )
 import Cardano.Wallet.Network
     ( NetworkLayer, fetchRewardAccountBalances, timeInterpreter )
 import Cardano.Wallet.Primitive.AddressDerivation
@@ -762,6 +764,7 @@ postWallet
         , Typeable s
         , Typeable n
         , (k == SharedKey) ~ 'False
+        , AddressBookIso s
         )
     => ctx
     -> ((SomeMnemonic, Maybe SomeMnemonic) -> Passphrase "encryption" -> k 'RootK XPrv)
@@ -789,6 +792,7 @@ postShelleyWallet
         , Typeable s
         , Typeable n
         , (k == SharedKey) ~ 'False
+        , AddressBookIso s
         )
     => ctx
     -> ((SomeMnemonic, Maybe SomeMnemonic) -> Passphrase "encryption" -> k 'RootK XPrv)
@@ -823,6 +827,7 @@ postAccountWallet
         , IsOurs s RewardAccount
         , (k == SharedKey) ~ 'False
         , Typeable n
+        , AddressBookIso s
         )
     => ctx
     -> MkApiWallet ctx s w
@@ -1140,6 +1145,7 @@ postLegacyWallet
         , IsOurs s Address
         , HasNetworkLayer IO ctx
         , WalletKey k
+        , AddressBookIso s
         )
     => ctx
         -- ^ Surrounding Context
@@ -1926,6 +1932,7 @@ postTransactionOld
         , Typeable n
         , Typeable s
         , WalletKey k
+        , AddressBookIso s
         )
     => ctx
     -> ArgGenChange s
@@ -2530,6 +2537,7 @@ joinStakePool
         , Typeable n
         , Typeable s
         , WalletKey k
+        , AddressBookIso s
         )
     => ctx
     -> IO (Set PoolId)
@@ -2658,6 +2666,7 @@ quitStakePool
         , Typeable n
         , Typeable s
         , WalletKey k
+        , AddressBookIso s
         )
     => ctx
     -> ApiT WalletId
@@ -3603,6 +3612,7 @@ newApiLayer
         ( ctx ~ ApiLayer s k
         , IsOurs s RewardAccount
         , IsOurs s Address
+        , AddressBookIso s
         )
     => Tracer IO WalletEngineLog
     -> (Block, NetworkParameters, SyncTolerance)
@@ -3628,6 +3638,7 @@ startWalletWorker
         ( ctx ~ ApiLayer s k
         , IsOurs s RewardAccount
         , IsOurs s Address
+        , AddressBookIso s
         )
     => ctx
     -> (WorkerCtx ctx -> WalletId -> IO ())
@@ -3648,6 +3659,7 @@ createWalletWorker
         ( ctx ~ ApiLayer s k
         , IsOurs s RewardAccount
         , IsOurs s Address
+        , AddressBookIso s
         )
     => ctx
         -- ^ Surrounding API context
@@ -3677,6 +3689,7 @@ registerWorker
         ( ctx ~ ApiLayer s k
         , IsOurs s RewardAccount
         , IsOurs s Address
+        , AddressBookIso s
         )
     => ctx
     -> (WorkerCtx ctx -> WalletId -> IO ())
