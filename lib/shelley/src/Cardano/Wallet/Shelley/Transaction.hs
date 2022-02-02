@@ -113,6 +113,8 @@ import Cardano.Wallet.Primitive.Types.Coin
     ( Coin (..) )
 import Cardano.Wallet.Primitive.Types.Hash
     ( Hash )
+import Cardano.Wallet.Primitive.Types.Hash
+    ( Hash (..) )
 import Cardano.Wallet.Primitive.Types.Redeemer
     ( Redeemer, redeemerData )
 import Cardano.Wallet.Primitive.Types.TokenBundle
@@ -203,7 +205,7 @@ import Data.Kind
 import Data.Map.Strict
     ( Map, (!) )
 import Data.Maybe
-    ( mapMaybe )
+    ( fromMaybe, mapMaybe )
 import Data.Quantity
     ( Quantity (..) )
 import Data.Set
@@ -576,21 +578,51 @@ _decodeSealedTx :: SealedTx -> (Tx, TokenMap, TokenMap, [Certificate])
 _decodeSealedTx (cardanoTx -> InAnyCardanoEra _era tx) = fromCardanoTx tx
 
 _evaluateTransactionBalance
-    :: SealedTx -> Cardano.ProtocolParameters -> UTxO -> Maybe Cardano.Value
-_evaluateTransactionBalance tx pp utxo = do
+    :: SealedTx
+    -> Cardano.ProtocolParameters
+    -> UTxO
+    -> [(TxIn, TxOut, Maybe (Hash "Datum"))]
+    -> Maybe Cardano.Value
+_evaluateTransactionBalance tx pp utxo extraUTxO = do
     shelleyTx <- inAnyShelleyBasedEra $ cardanoTx tx
     pure $ withShelleyBasedBody shelleyTx $ \era bod ->
         let
-            utxo' =  Cardano.UTxO
-                . Map.fromList
+            utxo' = Map.fromList
                 . map (bimap toCardanoTxIn (toCardanoTxOut era))
                 . Map.toList
                 $ unUTxO utxo
 
+            extraUTxO' = Map.fromList
+                . map (\(i, o, mDatumHash) ->
+                    (toCardanoTxIn i, setDatumHash era mDatumHash (toCardanoTxOut era o))
+                    )
+                $ extraUTxO
+
         in
             lovelaceFromCardanoTxOutValue
-                $ Cardano.evaluateTransactionBalance pp mempty utxo' bod
+                $ Cardano.evaluateTransactionBalance
+                    pp
+                    mempty
+                    (Cardano.UTxO $ utxo' <> extraUTxO')
+                    -- NOTE: We don't want the keys to overlap! Unclear how to
+                    -- address.
+                    bod
   where
+    setDatumHash :: ShelleyBasedEra era -> Maybe (Hash "Datum") -> Cardano.TxOut ctx era -> Cardano.TxOut ctx era
+    setDatumHash _era Nothing o = o
+    setDatumHash era (Just (Hash datumHash)) (Cardano.TxOut addr val _) =
+        Cardano.TxOut addr val (Cardano.TxOutDatumHash scriptDataSupported hash)
+      where
+        scriptDataSupported = case era of
+            ShelleyBasedEraAlonzo  -> Cardano.ScriptDataInAlonzoEra
+            _ -> error "todo: proper error handling - script data not supported in era"
+
+        -- TODO: Proper error handling!
+
+        hash = fromMaybe (error $ "couldn't deserialize hash: " <> show datumHash) $ Cardano.deserialiseFromRawBytes
+            (Cardano.AsHash Cardano.AsScriptData)
+            datumHash
+
     lovelaceFromCardanoTxOutValue
         :: forall era. Cardano.TxOutValue era -> Cardano.Value
     lovelaceFromCardanoTxOutValue (Cardano.TxOutAdaOnly _ ada) =

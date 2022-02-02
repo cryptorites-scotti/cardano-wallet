@@ -193,8 +193,8 @@ data TransactionLayer k tx = TransactionLayer
     , evaluateTransactionBalance
         :: SealedTx
         -> Node.ProtocolParameters
-        -> UTxO -- NOTE: The Wallet UTxO type cannot represent datum hashes.
-            -- This is actually important and will need a workaround.
+        -> UTxO
+        -> [(TxIn, TxOut, Maybe (Hash "Datum"))] -- Extra UTxO
         -> Maybe Node.Value
         -- ^ Evaluate the balance of a transaction using the ledger. A valid
         -- transaction must be balanced.
