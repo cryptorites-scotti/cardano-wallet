@@ -4002,19 +4002,34 @@ instance IsServerError ErrBalanceTx where
             apiError err403 CreatedInvalidTransaction $ mconcat
                 [ "I cannot balance transactions with pre-defined collateral."
                 ]
+
+        ErrBalanceTxFailedBalancing v ->
+            apiError err500 CreatedInvalidTransaction $ mconcat
+                [ "I have somehow failed balancing the transaction. The balance"
+                , " is " <> T.pack (show v)
+                ]
+        ErrBalanceTxNotYetSupported Deposits ->
+             apiError err500 CreatedInvalidTransaction $ mconcat
+                 [ "Deposits/refunds are not yet supported for balancing."
+                 ]
+        ErrBalanceTxNotYetSupported (UnderestimatedFee c _) ->
+            apiError err500 CreatedInvalidTransaction $ mconcat
+                [ "I have somehow underestimated the fee of the transaction "
+                , " by " <> pretty c
+                , "and cannot finish balancing."
+                ]
         ErrBalanceTxNotYetSupported ZeroAdaOutput ->
             apiError err500 CreatedInvalidTransaction $ mconcat
                 [ "The transaction contains one or more zero ada outputs."
                 ]
-        ErrBalanceTxNotYetSupported Deposits ->
-            apiError err500 CreatedInvalidTransaction $ mconcat
-                [ "Deposits/refunds are not yet supported for balancing."
-                ]
-        ErrBalanceTxNotYetSupported (UnderestimatedFee _) ->
-            apiError err500 CreatedInvalidTransaction $ mconcat
-                [ "What was supposed to be an initial overestimation of fees "
-                , "turned out to be an underestimation, and I cannot recover. "
-                , "This is a cardano-wallet bug."
+        ErrBalanceTxOverlappingInputResolution ->
+            apiError err403 CreatedInvalidTransaction $ mconcat
+                [ "Input resolution overlaps with wallet UTxO"
+                ] -- TODO: Some overlap needs to be allowed!
+        ErrBalanceTxUnableToMinimizeFee _deficit ->
+            apiError err403 CreatedInvalidTransaction $ mconcat
+                [ "I cannot minimize fees because I cannot construct a change "
+                , "output. Try ensuring the wallet has at least a couple of ada."
                 ]
 
 instance IsServerError ErrMintBurnAssets where
