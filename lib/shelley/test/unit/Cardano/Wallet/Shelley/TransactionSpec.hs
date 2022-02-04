@@ -2482,8 +2482,6 @@ prop_balanceTransactionBalanced (Wallet' utxo wal pending) (ShowBuildable partia
                 (SelectionBalanceErrorOf
                 (InsufficientMinCoinValues _)))) ->
                 label "outputs below minCoinValue" $ property True
-            Left (ErrBalanceTxNotYetSupported Deposits) ->
-                label ("not yet supported: deposits") True
             Left (ErrBalanceTxExistingCollateral) ->
                 label "existing collateral" True
             Left (ErrBalanceTxNotYetSupported ZeroAdaOutput) ->
@@ -2506,6 +2504,8 @@ prop_balanceTransactionBalanced (Wallet' utxo wal pending) (ShowBuildable partia
                 (SelectionBalanceErrorOf
                 (SelectionLimitReached _)))) ->
                 label "selection limit reached" $ property True
+            Left ErrBalanceTxOverlappingInputResolution ->
+                label "resolved input conflicts with wallet UTxO" $ property True
             Left
                 (ErrBalanceTxSelectAssets
                 (ErrSelectAssetsSelectionError

@@ -4008,10 +4008,6 @@ instance IsServerError ErrBalanceTx where
                 [ "I have somehow failed balancing the transaction. The balance"
                 , " is " <> T.pack (show v)
                 ]
-        ErrBalanceTxNotYetSupported Deposits ->
-             apiError err500 CreatedInvalidTransaction $ mconcat
-                 [ "Deposits/refunds are not yet supported for balancing."
-                 ]
         ErrBalanceTxNotYetSupported (UnderestimatedFee c _) ->
             apiError err500 CreatedInvalidTransaction $ mconcat
                 [ "I have somehow underestimated the fee of the transaction "

@@ -1644,7 +1644,7 @@ spec = describe "NEW_SHELLEY_TRANSACTIONS" $ do
 
     it "TRANS_NEW_BALANCE_02b - Cannot balance when I cannot afford fee" $
         \ctx -> runResourceT $ do
-        wa <- fixtureWalletWith @n ctx [2 * 1_000_000]
+        wa <- fixtureWalletWith @n ctx [3_300_000]
         let balancePayload = Json PlutusScenario.pingPong_1
         rTx <- request @ApiSerialisedTransaction ctx
             (Link.balanceTransaction @'Shelley wa) Default balancePayload
@@ -1656,9 +1656,9 @@ spec = describe "NEW_SHELLEY_TRANSACTIONS" $ do
     it "TRANS_NEW_BALANCE_02c - \
         \Cannot balance when I cannot afford collateral" $
         \ctx -> runResourceT $ do
+        liftIO $ pendingWith "unreachable with current params (need ≈2.2 ada for collateral, need ≈3.4 ada for balancing)"
         wa <- fixtureWalletWith @n ctx
-            [ 2_000_000
-            , 2_000_000
+            [ 3_300_000
             ]
         let toBalance = Json PlutusScenario.pingPong_1
         rTx <- request @ApiSerialisedTransaction ctx
@@ -1688,11 +1688,11 @@ spec = describe "NEW_SHELLEY_TRANSACTIONS" $ do
             , expectErrorMessage errMsg403Collateral
             , expectErrorMessage $ unwords
                 [ "I need an ada amount of at least:"
-                , "2.779500"
+                , "2.627700"
                 ]
             , expectErrorMessage $ unwords
                 [ "The largest combination of pure ada UTxOs I could find is:"
-                , "[1.853000]"
+                , "[1.873000]"
                 ]
             ]
 
