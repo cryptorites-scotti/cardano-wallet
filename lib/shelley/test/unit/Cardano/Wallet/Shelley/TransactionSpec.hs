@@ -2389,7 +2389,7 @@ prop_balanceTransactionIncreaseWalletBalance = describe "balance goldens" $ do
 
     mw = SomeMnemonic $ either (error . show) id (entropyToMnemonic @12 <$> mkEntropy "0000000000000000")
     rootK = Shelley.unsafeGenerateKeyFromSeed (mw, Nothing) mempty
-    addr = Address $ unsafeFromHex "1101b9eddcb9e997a4dd423faee1574e413c23da4406ffb4e06c9a7af5341dfd84fc5d3ae3ba3bfd956904523362dc1c7a3b058af45d9e633d"
+    addr = Address $ unsafeFromHex "60b1e5e0fb74c86c801f646841e07cdb42df8b82ef3ce4e57cb5412e77"
 
     pingPong_1 :: PartialTx
     pingPong_1 = PartialTx tx [] []
