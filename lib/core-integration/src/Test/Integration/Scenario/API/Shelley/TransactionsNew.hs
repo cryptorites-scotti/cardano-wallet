@@ -1802,17 +1802,13 @@ spec = describe "NEW_SHELLEY_TRANSACTIONS" $ do
             ]
 
     it "TRANS_NEW_BALANCE_05/ADP-1286 - \
-        \I can balance correctly in case I need to spend my remaining ADA for fee" $
+        \I can balance correctly in case I have just enough" $
         \ctx -> runResourceT $ do
-        liftIO $ pendingWith
-            "ADP-1286 - ValueNotConservedUTxO: Transaction seems balanced incorrectly \
-            \in case when less than minUtxOValue is left on the wallet"
-        wa <- fixtureWalletWith @n ctx [3_000_000]
-        -- PlutusScenario.pingPong_1 is sending out 2₳ therefore tx fee
-        -- needs to be 1₳ to comply with minUTxOValue constraint
-        let expectedFee = 1_000_000
+        let initialBalance = 3_180_000
+        wa <- fixtureWalletWith @n ctx [initialBalance]
+        -- PlutusScenario.pingPong_1 is sending out 2₳
+        let amt = 2_000_000
         let balancePayload = Json PlutusScenario.pingPong_1
-        let hasExpectedFee = [expectField (#fee . #getQuantity) (`shouldBe` expectedFee)]
 
         rTx <- request @ApiSerialisedTransaction ctx
             (Link.balanceTransaction @'Shelley wa) Default balancePayload
@@ -1822,7 +1818,7 @@ spec = describe "NEW_SHELLEY_TRANSACTIONS" $ do
 
         rDecodedTx <- request @(ApiDecodedTransaction n) ctx
             (Link.decodeTransaction @'Shelley wa) Default decodePayload
-        verify rDecodedTx hasExpectedFee
+        let expectedFee = getFromResponse (#fee . #getQuantity) rDecodedTx
 
         signedTx <- signTx ctx wa apiTx [ expectResponseCode HTTP.status202 ]
         submittedTx <- submitTxWithWid ctx wa signedTx
@@ -1838,8 +1834,24 @@ spec = describe "NEW_SHELLEY_TRANSACTIONS" $ do
                 [ expectSuccess
                 , expectField
                         (#balance . #available . #getQuantity)
-                        (`shouldBe` 0)
+                        (`shouldBe` (initialBalance - amt - expectedFee))
                 ]
+
+    it "TRANS_NEW_BALANCE_05/ADP-1286 - \
+        \I cannot balance in case I have too little" $
+        \ctx -> runResourceT $ do
+        let initialBalance = 3_000_000
+        wa <- fixtureWalletWith @n ctx [initialBalance]
+        -- PlutusScenario.pingPong_1 is sending out 2₳
+        let balancePayload = Json PlutusScenario.pingPong_1
+
+        rTx <- request @ApiSerialisedTransaction ctx
+            (Link.balanceTransaction @'Shelley wa) Default balancePayload
+        verify rTx
+            [ expectResponseCode HTTP.status403
+            , expectErrorMessage "I cannot minimize fees because I cannot construct\
+                                 \ a change output. Try ensuring the wallet has at\
+                                 \ least a couple of ada." ]
 
     it "TRANS_NEW_SIGN_01 - Sign single-output transaction" $ \ctx -> runResourceT $ do
         w <- fixtureWallet ctx
