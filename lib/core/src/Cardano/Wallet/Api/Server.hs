@@ -1664,19 +1664,24 @@ selectCoinsForQuit
         , ctx ~ ApiLayer s k
         , DelegationAddress n k
         , MkKeyFingerprint k (Proxy n, k 'AddressK XPub)
+        , Bounded (Index (AddressIndexDerivationType k) 'AddressK)
         , SoftDerivation k
         , Typeable n
         , Typeable s
+        , WalletKey k
         )
     => ctx
     -> ApiT WalletId
     -> Handler (Api.ApiCoinSelection n)
 selectCoinsForQuit ctx (ApiT wid) = do
     withWorkerCtx ctx wid liftE liftE $ \wrk -> do
-        action <- liftHandler $ W.quitStakePool @_ @s @k wrk wid
+        (wdrl, _mkRwdAcct) <-
+            mkRewardAccountBuilder @_ @s @_ @n ctx wid (Just SelfWithdrawal)
+        action <- liftHandler $ W.quitStakePool @_ @s @k wrk wid wdrl
 
         let txCtx = defaultTransactionCtx
                 { txDelegationAction = Just action
+                , txWithdrawal = wdrl
                 }
 
         let transform s sel =
@@ -2187,7 +2192,7 @@ constructTransaction ctx genChange knownPools getPoolStatus (ApiT wid) body = do
                             W.joinStakePool @_ @s @k wrk curEpoch pools pid poolStatus wid
                         pure (del, act, Nothing)
                     [(Leaving _)] -> do
-                        del <- liftHandler $ W.quitStakePool @_ @s @k wrk wid
+                        del <- liftHandler $ W.quitStakePool @_ @s @k wrk wid wdrl
                         pure (del, Nothing, Just $ W.stakeKeyDeposit pp)
                     _ ->
                         liftHandler $ throwE ErrConstructTxMultidelegationNotSupported
@@ -2667,10 +2672,8 @@ quitStakePool ctx (ApiT wid) body = do
     let pwd = coerce $ getApiT $ body ^. #passphrase
 
     (sel, tx, txMeta, txTime, pp) <- withWorkerCtx ctx wid liftE liftE $ \wrk -> do
-        action <- liftHandler
-            $ W.quitStakePool @_ @s @k wrk wid
-
-        (wdrl, mkRwdAcct) <- mkRewardAccountBuilder @_ @s @_ @n ctx wid Nothing
+        (wdrl, mkRwdAcct) <- mkRewardAccountBuilder @_ @s @_ @n ctx wid (Just SelfWithdrawal)
+        action <- liftHandler $ W.quitStakePool wrk wid wdrl
         ttl <- liftIO $ W.getTxExpiry ti Nothing
         let txCtx = defaultTransactionCtx
                 { txWithdrawal = wdrl
@@ -3455,16 +3458,12 @@ mkApiTransaction timeInterpreter setTimeReference tx = do
     reclaimIfAny :: Natural
     reclaimIfAny
         | tx ^. (#txMeta . #direction) == W.Incoming =
-              if ( totalInWithoutFee > 0 && totalOut > 0 && totalOut > totalInWithoutFee)
-                 && (totalOut - totalInWithoutFee <= depositValue) then
+              if ( totalIn > 0 && totalOut > 0 && totalOut > totalIn)
+                 && (totalOut - totalIn <= depositValue) then
                   depositValue
               else
                   0
         | otherwise = 0
-
-    totalInWithoutFee :: Natural
-    totalInWithoutFee
-        = sum (txOutValue <$> mapMaybe snd (tx ^. #txInputs))
 
     totalIn :: Natural
     totalIn

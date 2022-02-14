@@ -27,6 +27,7 @@ import Cardano.Wallet.Api.Types
     , ApiTxInput (..)
     , ApiWallet
     , ApiWalletDelegationStatus (..)
+    , ApiWithdrawal (..)
     , DecodeAddress
     , DecodeStakeAddress
     , EncodeAddress
@@ -122,6 +123,7 @@ import Test.Integration.Framework.DSL
     , quitStakePoolUnsigned
     , replaceStakeKey
     , request
+    , rewardWallet
     , triggerMaintenanceAction
     , unsafeRequest
     , unsafeResponse
@@ -139,7 +141,6 @@ import Test.Integration.Framework.DSL
 import Test.Integration.Framework.TestData
     ( errMsg403EmptyUTxO
     , errMsg403Fee
-    , errMsg403NonNullReward
     , errMsg403NotDelegating
     , errMsg403PoolAlreadyJoined
     , errMsg403WrongPass
@@ -401,6 +402,8 @@ spec = describe "SHELLEY_STAKE_POOLS" $ do
             [ expectResponseCode HTTP.status202
             , expectField (#status . #getApiT) (`shouldBe` Pending)
             , expectField (#direction . #getApiT) (`shouldBe` Incoming)
+            , expectField #depositTaken (`shouldBe` Quantity 0)
+            , expectField #depositReturned (`shouldBe` Quantity 1000000)
             ]
         let txid = getFromResponse Prelude.id rq
         let quitFeeAmt = getFromResponse #amount rq
@@ -524,6 +527,26 @@ spec = describe "SHELLEY_STAKE_POOLS" $ do
             , expectErrorMessage errMsg403NotDelegating
             ]
 
+    it "STAKE_POOLS_QUIT_03 - Can quit with rewards"
+        $ \ctx -> runResourceT $ do
+        (w, _) <- rewardWallet ctx
+
+        pool:_:_ <- map (view #id) . snd
+            <$> unsafeRequest @[ApiStakePool]
+                ctx (Link.listStakePools arbitraryStake) Empty
+        joinStakePool @n ctx pool (w, fixturePassphrase) >>= flip verify
+            [ expectResponseCode HTTP.status202
+            , expectField #depositTaken (`shouldBe` (Quantity 0))
+            , expectField #depositReturned (`shouldBe` (Quantity 0))
+            ]
+        waitForTxImmutability ctx
+        quitStakePool @n ctx (w, fixturePassphrase) >>= flip verify
+            [ expectResponseCode HTTP.status202
+            , expectField #depositTaken (`shouldBe` (Quantity 0))
+            , expectField #depositReturned
+                (`shouldBe` (Quantity 1000000))
+            ]
+
     it "STAKE_POOLS_JOIN_01 - Can rejoin another stakepool" $ \ctx -> runResourceT $ do
         w <- fixtureWallet ctx
         pool1:pool2:_ <- map (view #id) . snd
@@ -626,10 +649,12 @@ spec = describe "SHELLEY_STAKE_POOLS" $ do
                         (.> (Quantity 0))
                     ]
 
-        -- Can't quite if unspoiled rewards.
+        -- Can quit with rewards
         quitStakePool @n ctx (w, fixturePassphrase) >>= flip verify
-            [ expectResponseCode HTTP.status403
-            , expectErrorMessage errMsg403NonNullReward
+            [ expectResponseCode HTTP.status202
+            , expectField #depositReturned (`shouldBe` Quantity 1000000)
+            , expectField (#withdrawals)
+                (\[ApiWithdrawal _ c] -> c .> Quantity 0)
             ]
 
     it "STAKE_POOLS_JOIN_05 - \
