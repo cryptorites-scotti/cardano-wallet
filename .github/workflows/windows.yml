@@ -40,7 +40,7 @@ jobs:
     needs: setup
     runs-on: windows-2022
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: cardano-wallet-tests-win64
       - run: '.\\cardano-wallet-core-test-unit.exe --color --jobs 1 --skip /Cardano.Wallet.DB.Sqlite/ +RTS -M2G -N2'
@@ -50,7 +50,7 @@ jobs:
     needs: setup
     runs-on: windows-2022
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: cardano-wallet-tests-win64
       - run: '.\\cardano-wallet-test-unit.exe --color'
@@ -60,7 +60,7 @@ jobs:
     needs: setup
     runs-on: windows-2022
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: cardano-wallet-tests-win64
       - run: '.\\cardano-wallet-cli-test-unit.exe --color'
@@ -70,7 +70,7 @@ jobs:
     needs: setup
     runs-on: windows-2022
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: cardano-wallet-tests-win64
       - run: '.\\text-class-test-unit.exe --color'
@@ -80,7 +80,7 @@ jobs:
     needs: setup
     runs-on: windows-2022
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: cardano-wallet-tests-win64
       - run: '.\\cardano-wallet-launcher-test-unit.exe --color'
@@ -92,7 +92,7 @@ jobs:
     if: ${{ startsWith(github.ref, 'refs/heads/bors/') || startsWith(github.ref, 'refs/heads/release/v') }}
     runs-on: windows-2022
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: cardano-wallet-tests-win64
       - run: '.\\cardano-wallet-test-integration.exe --color'
